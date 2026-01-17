@@ -148,7 +148,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                 onClick={() => setShowNotifications(false)}
               />
               <div className={cn(
-                'absolute right-0 top-full mt-2 w-96 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden',
+                'fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-16 sm:top-full sm:mt-2 sm:w-96 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden',
                 isDark
                   ? 'bg-gray-800 border border-gray-700'
                   : 'bg-white border border-border'
