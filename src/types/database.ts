@@ -1,0 +1,101 @@
+export type ProductCategory = 'material_remodelacion' | 'herramienta_remodelacion' | 'material_plomeria' | 'herramienta_plomeria'
+
+export type ResponsiblePerson = 'jordi' | 'gustavo' | 'david' | 'taurus'
+
+export interface Product {
+  id: string
+  name: string
+  description?: string
+  category: ProductCategory
+  stock: number
+  min_stock: number
+  unit: string
+  price?: number
+  supplier?: string
+  location?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface StockMovement {
+  id: string
+  product_id: string
+  product?: Product
+  quantity: number
+  movement_type: 'entrada' | 'salida' | 'ajuste'
+  responsible: ResponsiblePerson | null
+  notes?: string
+  original_message?: string
+  created_at: string
+}
+
+export interface Delivery {
+  id: string
+  product_id: string
+  product?: Product
+  quantity: number
+  responsible: ResponsiblePerson
+  notes?: string
+  delivered_at: string
+  created_at: string
+}
+
+export type PurchaseStatus = 'pendiente' | 'completada' | 'cancelada'
+export type QuoteStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'vencida'
+export type PaymentMethod = 'efectivo' | 'transferencia' | 'tarjeta' | 'credito'
+
+export interface Purchase {
+  id: string
+  supplier: string
+  description: string
+  total: number
+  status: PurchaseStatus
+  payment_method?: PaymentMethod
+  invoice_number?: string
+  notes?: string
+  purchased_at: string
+  created_at: string
+}
+
+export interface Quote {
+  id: string
+  supplier: string
+  description: string
+  total: number
+  status: QuoteStatus
+  valid_until?: string
+  notes?: string
+  created_at: string
+}
+
+export interface Database {
+  public: {
+    Tables: {
+      products: {
+        Row: Product
+        Insert: Omit<Product, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<Product, 'id' | 'created_at' | 'updated_at'>>
+      }
+      stock_movements: {
+        Row: StockMovement
+        Insert: Omit<StockMovement, 'id' | 'created_at'>
+        Update: Partial<Omit<StockMovement, 'id' | 'created_at'>>
+      }
+      deliveries: {
+        Row: Delivery
+        Insert: Omit<Delivery, 'id' | 'created_at'>
+        Update: Partial<Omit<Delivery, 'id' | 'created_at'>>
+      }
+      purchases: {
+        Row: Purchase
+        Insert: Omit<Purchase, 'id' | 'created_at'>
+        Update: Partial<Omit<Purchase, 'id' | 'created_at'>>
+      }
+      quotes: {
+        Row: Quote
+        Insert: Omit<Quote, 'id' | 'created_at'>
+        Update: Partial<Omit<Quote, 'id' | 'created_at'>>
+      }
+    }
+  }
+}

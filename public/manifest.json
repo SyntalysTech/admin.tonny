@@ -1,0 +1,23 @@
+{
+  "name": "Admin Tonny - Sistema de Inventario",
+  "short_name": "Admin Tonny",
+  "description": "Sistema de administracion de inventario y materiales",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F9FAFB",
+  "theme_color": "#00C48C",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logos/logo-icon-alone-green-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logos/logo-favicon-64x64.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    }
+  ]
+}
