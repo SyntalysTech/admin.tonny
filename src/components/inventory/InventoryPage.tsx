@@ -90,6 +90,9 @@ export function InventoryPage({ category, title, subtitle }: InventoryPageProps)
       render: (item: Product) => (
         <div>
           <p className="font-medium text-foreground">{item.name}</p>
+          {item.brand && (
+            <p className="text-xs text-primary">{item.brand}</p>
+          )}
           {item.description && (
             <p className="text-xs sm:text-sm text-muted-foreground truncate max-w-[200px] sm:max-w-xs">{item.description}</p>
           )}
@@ -98,36 +101,58 @@ export function InventoryPage({ category, title, subtitle }: InventoryPageProps)
     },
     {
       key: 'stock',
-      label: 'Stock',
+      label: 'Stock Total',
       sortable: true,
       render: (item: Product) => (
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-          <span className="font-semibold">{item.stock}</span>
-          <span className="text-xs sm:text-sm text-muted-foreground">{item.unit}(s)</span>
-          {item.stock <= item.min_stock && (
-            <Badge variant="warning" className="text-[10px] sm:text-xs">Bajo</Badge>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span className="font-semibold text-lg">{item.stock}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">{item.unit}</span>
+            {item.stock <= item.min_stock && (
+              <Badge variant="warning" className="text-[10px] sm:text-xs">Bajo</Badge>
+            )}
+          </div>
+          {item.unit_size && item.quantity && (
+            <p className="text-xs text-muted-foreground">
+              {item.quantity} pzas x {item.unit_size} {item.unit}
+            </p>
           )}
         </div>
       ),
     },
     {
+      key: 'quantity',
+      label: 'Cantidad',
+      sortable: true,
+      className: 'hidden md:table-cell',
+      render: (item: Product) => item.unit_size && item.quantity ? (
+        <div className="text-center">
+          <span className="font-medium">{item.quantity}</span>
+          <p className="text-xs text-muted-foreground">piezas</p>
+        </div>
+      ) : '-',
+    },
+    {
+      key: 'unit_size',
+      label: 'Medida/U',
+      sortable: true,
+      className: 'hidden lg:table-cell',
+      render: (item: Product) => item.unit_size ? (
+        <span>{item.unit_size} {item.unit}</span>
+      ) : '-',
+    },
+    {
       key: 'min_stock',
       label: 'Min.',
       sortable: true,
-      className: 'hidden md:table-cell',
+      className: 'hidden lg:table-cell',
     },
     {
       key: 'supplier',
       label: 'Proveedor',
       sortable: true,
-      className: 'hidden lg:table-cell',
-      render: (item: Product) => item.supplier || '-',
-    },
-    {
-      key: 'location',
-      label: 'Ubicacion',
       className: 'hidden xl:table-cell',
-      render: (item: Product) => item.location || '-',
+      render: (item: Product) => item.supplier || '-',
     },
     {
       key: 'actions',
@@ -252,7 +277,7 @@ export function InventoryPage({ category, title, subtitle }: InventoryPageProps)
               data={categoryProducts}
               columns={columns}
               searchable
-              searchKeys={['name', 'description', 'supplier', 'location']}
+              searchKeys={['name', 'description', 'supplier', 'location', 'brand']}
               getRowId={(item) => item.id}
               pageSize={10}
             />

@@ -7,12 +7,16 @@ export interface Product {
   name: string
   description?: string
   category: ProductCategory
-  stock: number
+  stock: number // Stock total calculado (quantity * unit_size) o manual
   min_stock: number
-  unit: string
+  unit: string // Unidad de medida (pies, metros, galones, unidad, etc.)
+  unit_size?: number // Medida por unidad de fábrica (ej: 10 pies por rollo)
+  quantity?: number // Cantidad de unidades/piezas en inventario
   price?: number
   supplier?: string
   location?: string
+  brand?: string // Marca del producto
+  notes?: string // Notas adicionales
   created_at: string
   updated_at: string
 }

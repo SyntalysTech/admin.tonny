@@ -53,7 +53,7 @@ const functions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'add_product',
-      description: 'Agrega un nuevo producto al inventario. Deduce categoria automaticamente si no se especifica.',
+      description: 'Agrega un nuevo producto al inventario. Para productos con medida (vinilo, cable, tubo), usa unit_size y quantity para calcular stock total.',
       parameters: {
         type: 'object',
         properties: {
@@ -64,14 +64,18 @@ const functions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
             enum: ['material_remodelacion', 'herramienta_remodelacion', 'material_plomeria', 'herramienta_plomeria'],
             description: 'Categoria del producto',
           },
-          stock: { type: 'number', description: 'Cantidad inicial en stock' },
+          unit: { type: 'string', description: 'Unidad de medida (pies, metros, galon, unidad, kg, pieza, etc)' },
+          unit_size: { type: 'number', description: 'Medida por unidad de fabrica (ej: 10 si cada rollo tiene 10 pies). Si no aplica, omitir.' },
+          quantity: { type: 'number', description: 'Cantidad de unidades/piezas (ej: 30 rollos). Si no usa unit_size, este es el stock directo.' },
+          stock: { type: 'number', description: 'Stock total directo. Usar solo si no se usa unit_size/quantity (se calcula automaticamente si se dan ambos).' },
           min_stock: { type: 'number', description: 'Stock minimo para alerta (default: 5)' },
-          unit: { type: 'string', description: 'Unidad de medida (unidad, metro, galon, kg, pieza, bolsa, etc)' },
           price: { type: 'number', description: 'Precio unitario (opcional)' },
           supplier: { type: 'string', description: 'Proveedor (opcional)' },
+          brand: { type: 'string', description: 'Marca del producto (opcional)' },
           location: { type: 'string', description: 'Ubicacion en bodega (opcional)' },
+          notes: { type: 'string', description: 'Notas adicionales (opcional)' },
         },
-        required: ['name', 'category', 'stock', 'unit'],
+        required: ['name', 'category', 'unit'],
       },
     },
   },
@@ -79,7 +83,7 @@ const functions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'update_product',
-      description: 'Actualiza un producto existente (nombre, precio, stock minimo, proveedor, ubicacion, etc)',
+      description: 'Actualiza un producto existente. Si cambias unit_size o quantity, el stock se recalcula automaticamente.',
       parameters: {
         type: 'object',
         properties: {
@@ -92,9 +96,14 @@ const functions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
               description: { type: 'string' },
               min_stock: { type: 'number' },
               unit: { type: 'string' },
+              unit_size: { type: 'number', description: 'Medida por unidad de fabrica' },
+              quantity: { type: 'number', description: 'Cantidad de unidades' },
+              stock: { type: 'number', description: 'Stock total (se recalcula si hay unit_size y quantity)' },
               price: { type: 'number' },
               supplier: { type: 'string' },
+              brand: { type: 'string' },
               location: { type: 'string' },
+              notes: { type: 'string' },
             },
           },
         },
@@ -458,18 +467,30 @@ async function executeFunction(name: string, args: Record<string, unknown>): Pro
         if (error) throw error
 
         // Formatear para respuesta mas legible
-        const products = (data || []).map(p => ({
-          id: p.id,
-          nombre: p.name,
-          stock: `${p.stock} ${p.unit}`,
-          stock_numerico: p.stock,
-          min_stock: p.min_stock,
-          categoria: p.category,
-          precio: p.price ? `$${p.price}` : 'Sin precio',
-          proveedor: p.supplier || 'No especificado',
-          ubicacion: p.location || 'No especificada',
-          alerta: p.stock <= p.min_stock ? '⚠️ STOCK BAJO' : null,
-        }))
+        const products = (data || []).map(p => {
+          const hasUnitSize = p.unit_size && p.quantity
+          return {
+            id: p.id,
+            nombre: p.name,
+            // Si tiene unit_size, mostrar desglose
+            ...(hasUnitSize ? {
+              medida_por_unidad: `${p.unit_size} ${p.unit}`,
+              cantidad_unidades: p.quantity,
+              stock_total: `${p.stock} ${p.unit}`,
+            } : {
+              stock: `${p.stock} ${p.unit}`,
+            }),
+            stock_numerico: p.stock,
+            min_stock: p.min_stock,
+            categoria: p.category,
+            marca: p.brand || null,
+            precio: p.price ? `$${p.price}` : null,
+            proveedor: p.supplier || null,
+            ubicacion: p.location || null,
+            notas: p.notes || null,
+            alerta: p.stock <= p.min_stock ? '⚠️ STOCK BAJO' : null,
+          }
+        })
         return JSON.stringify(products)
       }
 
@@ -487,40 +508,71 @@ async function executeFunction(name: string, args: Record<string, unknown>): Pro
           })
         }
 
-        const products = data.map(p => ({
-          id: p.id,
-          nombre: p.name,
-          stock: `${p.stock} ${p.unit}`,
-          stock_numerico: p.stock,
-          min_stock: p.min_stock,
-          categoria: p.category,
-          precio: p.price ? `$${p.price}` : null,
-          proveedor: p.supplier,
-          ubicacion: p.location,
-        }))
+        const products = data.map(p => {
+          const hasUnitSize = p.unit_size && p.quantity
+          return {
+            id: p.id,
+            nombre: p.name,
+            ...(hasUnitSize ? {
+              medida_por_unidad: `${p.unit_size} ${p.unit}`,
+              cantidad_unidades: p.quantity,
+              stock_total: `${p.stock} ${p.unit}`,
+            } : {
+              stock: `${p.stock} ${p.unit}`,
+            }),
+            stock_numerico: p.stock,
+            min_stock: p.min_stock,
+            categoria: p.category,
+            marca: p.brand || null,
+            precio: p.price ? `$${p.price}` : null,
+            proveedor: p.supplier,
+            ubicacion: p.location,
+          }
+        })
         return JSON.stringify({ encontrados: products.length, productos: products })
       }
 
       case 'add_product': {
+        // Calcular stock total si se dan unit_size y quantity
+        let calculatedStock = args.stock as number || 0
+        const unitSize = args.unit_size as number | undefined
+        const quantity = args.quantity as number | undefined
+
+        if (unitSize && quantity) {
+          calculatedStock = unitSize * quantity
+        } else if (quantity && !unitSize) {
+          calculatedStock = quantity
+        }
+
         const { data, error } = await supabase
           .from('products')
           .insert({
             name: args.name,
             description: args.description || null,
             category: args.category,
-            stock: args.stock || 0,
+            stock: calculatedStock,
             min_stock: args.min_stock || 5,
             unit: args.unit || 'unidad',
+            unit_size: unitSize || null,
+            quantity: quantity || null,
             price: args.price || null,
             supplier: args.supplier || null,
+            brand: args.brand || null,
             location: args.location || null,
+            notes: args.notes || null,
           })
           .select()
           .single()
         if (error) throw error
+
+        const hasUnitSize = data.unit_size && data.quantity
+        const stockMsg = hasUnitSize
+          ? `${data.quantity} unidades x ${data.unit_size} ${data.unit} = ${data.stock} ${data.unit} en total`
+          : `${data.stock} ${data.unit}`
+
         return JSON.stringify({
           success: true,
-          mensaje: `Producto "${data.name}" agregado con ${data.stock} ${data.unit}`,
+          mensaje: `✅ Producto "${data.name}" agregado con ${stockMsg}`,
           producto: data
         })
       }
@@ -529,21 +581,37 @@ async function executeFunction(name: string, args: Record<string, unknown>): Pro
         // Primero obtener el producto actual
         const { data: current, error: fetchError } = await supabase
           .from('products')
-          .select('name')
+          .select('*')
           .eq('id', args.product_id)
           .single()
         if (fetchError) throw new Error('Producto no encontrado')
 
+        const updates = args.updates as Record<string, unknown>
+
+        // Recalcular stock si se actualizan unit_size o quantity
+        const newUnitSize = updates.unit_size !== undefined ? updates.unit_size as number : current.unit_size
+        const newQuantity = updates.quantity !== undefined ? updates.quantity as number : current.quantity
+
+        if (newUnitSize && newQuantity && (updates.unit_size !== undefined || updates.quantity !== undefined)) {
+          updates.stock = (newUnitSize as number) * (newQuantity as number)
+        }
+
         const { data, error } = await supabase
           .from('products')
-          .update(args.updates as Record<string, unknown>)
+          .update(updates)
           .eq('id', args.product_id)
           .select()
           .single()
         if (error) throw error
+
+        const hasUnitSize = data.unit_size && data.quantity
+        const stockInfo = hasUnitSize
+          ? `(${data.quantity} x ${data.unit_size} = ${data.stock} ${data.unit})`
+          : `(${data.stock} ${data.unit})`
+
         return JSON.stringify({
           success: true,
-          mensaje: `Producto "${current.name}" actualizado`,
+          mensaje: `✅ Producto "${current.name}" actualizado ${stockInfo}`,
           producto: data
         })
       }
