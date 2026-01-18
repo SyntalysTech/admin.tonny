@@ -77,7 +77,9 @@ export type InvoiceCategory = 'compras' | 'finanzas' | 'gastos'
 
 export interface InvoiceItem {
   sku?: string
+  model?: string
   description: string
+  size?: string
   quantity: number
   unit_price: number
   total: number

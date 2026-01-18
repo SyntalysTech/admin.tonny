@@ -6,7 +6,9 @@ import { createWorker } from 'tesseract.js'
 // Interface para items de factura
 interface InvoiceItem {
   sku?: string
+  model?: string
   description: string
+  size?: string
   quantity: number
   unit_price: number
   total: number
@@ -167,32 +169,102 @@ function extractInvoiceData(text: string): ExtractedInvoiceData {
   // Extraer items/productos
   const items: InvoiceItem[] = []
 
-  // Patrones para detectar líneas de productos
-  // Formato típico: SKU | Descripción | Cantidad | Precio | Total
-  const itemPatterns = [
-    // SKU Descripción Qty Price Total
-    /([A-Z0-9]{4,})\s+(.{10,50}?)\s+(\d+(?:\.\d+)?)\s+\$?([\d,]+\.?\d*)\s+\$?([\d,]+\.?\d*)/g,
-    // Descripción Qty @ Price = Total
-    /(.{10,50}?)\s+(\d+(?:\.\d+)?)\s*[@x]\s*\$?([\d,]+\.?\d*)\s*=?\s*\$?([\d,]+\.?\d*)/g,
-  ]
+  // Intentar extraer items línea por línea (formato Home Depot y similar)
+  const textLines = text.split('\n')
 
-  for (const pattern of itemPatterns) {
-    const matches = Array.from(text.matchAll(pattern))
-    for (const match of matches) {
-      if (match.length >= 5) {
-        const item: InvoiceItem = {
-          sku: match[1]?.match(/^[A-Z0-9]+$/) ? match[1] : undefined,
-          description: (match[1]?.match(/^[A-Z0-9]+$/) ? match[2] : match[1]) || 'Producto',
-          quantity: parseFloat(match[match.length - 3] || '1'),
-          unit_price: parseFloat((match[match.length - 2] || '0').replace(/,/g, '')),
-          total: parseFloat((match[match.length - 1] || '0').replace(/,/g, '')),
+  for (let i = 0; i < textLines.length; i++) {
+    const line = textLines[i].trim()
+
+    // Buscar líneas que parezcan items de producto
+    // Formato Home Depot: Description | Model # | SKU # | Size | Qty | Unit Price | Subtotal
+
+    // Patrón para detectar línea con precio al final (probablemente un item)
+    const pricePattern = /\$?([\d,]+\.\d{2})\s*$/
+    const priceMatch = line.match(pricePattern)
+
+    if (priceMatch) {
+      // Buscar cantidad y precio unitario
+      const qtyPricePattern = /(\d+)\s+\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})\s*$/
+      const qtyPriceMatch = line.match(qtyPricePattern)
+
+      if (qtyPriceMatch) {
+        const qty = parseInt(qtyPriceMatch[1])
+        const unitPrice = parseFloat(qtyPriceMatch[2].replace(/,/g, ''))
+        const totalPrice = parseFloat(qtyPriceMatch[3].replace(/,/g, ''))
+
+        // Obtener la descripción (todo lo que está antes de qty/price)
+        const descPart = line.replace(qtyPricePattern, '').trim()
+
+        // Intentar extraer Model # y SKU # de la descripción
+        let description = descPart
+        let model: string | undefined
+        let sku: string | undefined
+        let size: string | undefined
+
+        // Buscar patrones de modelo y SKU
+        const modelMatch = descPart.match(/([A-Z0-9]{5,15})\s+(\d{8,12})/)
+        if (modelMatch) {
+          model = modelMatch[1]
+          sku = modelMatch[2]
+          description = descPart.replace(modelMatch[0], '').trim()
+        } else {
+          // Buscar solo SKU (número largo)
+          const skuOnlyMatch = descPart.match(/\s(\d{8,12})\s/)
+          if (skuOnlyMatch) {
+            sku = skuOnlyMatch[1]
+            description = descPart.replace(skuOnlyMatch[1], '').trim()
+          }
         }
-        if (item.total > 0) {
-          items.push(item)
+
+        // Buscar size (ej: "each", "package", "gallon", etc.)
+        const sizeMatch = descPart.match(/\b(each|package|gallon|box|roll|bag|piece|ft|in|lb|oz)\b/i)
+        if (sizeMatch) {
+          size = sizeMatch[1]
+        }
+
+        // Solo agregar si parece un item válido
+        if (description.length > 3 && qty > 0 && totalPrice > 0) {
+          items.push({
+            description: description.slice(0, 100),
+            model,
+            sku,
+            size,
+            quantity: qty,
+            unit_price: unitPrice,
+            total: totalPrice,
+          })
         }
       }
     }
-    if (items.length > 0) break
+  }
+
+  // Si no encontramos items con el método anterior, usar patrones regex
+  if (items.length === 0) {
+    const itemPatterns = [
+      // SKU Descripción Qty Price Total
+      /([A-Z0-9]{4,})\s+(.{10,50}?)\s+(\d+(?:\.\d+)?)\s+\$?([\d,]+\.?\d*)\s+\$?([\d,]+\.?\d*)/g,
+      // Descripción Qty @ Price = Total
+      /(.{10,50}?)\s+(\d+(?:\.\d+)?)\s*[@x]\s*\$?([\d,]+\.?\d*)\s*=?\s*\$?([\d,]+\.?\d*)/g,
+    ]
+
+    for (const pattern of itemPatterns) {
+      const matches = Array.from(text.matchAll(pattern))
+      for (const match of matches) {
+        if (match.length >= 5) {
+          const item: InvoiceItem = {
+            sku: match[1]?.match(/^[A-Z0-9]+$/) ? match[1] : undefined,
+            description: (match[1]?.match(/^[A-Z0-9]+$/) ? match[2] : match[1]) || 'Producto',
+            quantity: parseFloat(match[match.length - 3] || '1'),
+            unit_price: parseFloat((match[match.length - 2] || '0').replace(/,/g, '')),
+            total: parseFloat((match[match.length - 1] || '0').replace(/,/g, '')),
+          }
+          if (item.total > 0) {
+            items.push(item)
+          }
+        }
+      }
+      if (items.length > 0) break
+    }
   }
 
   return {
