@@ -50,6 +50,10 @@ export default function RootLayout({
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="format-detection" content="telephone=no" />
+        <link rel="apple-touch-icon" href="/logos/icono-webapp-180x180.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/logos/icono-webapp-180x180.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/logos/icono-webapp-152x152.png" />
+        <link rel="apple-touch-icon" sizes="144x144" href="/logos/icono-webapp-144x144.png" />
       </head>
       <body className={`${inter.variable} antialiased`}>
         <AuthProvider>
