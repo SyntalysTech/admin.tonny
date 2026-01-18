@@ -26,6 +26,9 @@ import {
   Receipt,
   Boxes,
   ArrowRightLeft,
+  Upload,
+  Image,
+  Loader2,
 } from 'lucide-react'
 
 interface Message {
@@ -86,13 +89,15 @@ const modeConfigs: Record<AIMode, ModeConfig> = {
     color: 'text-amber-600 dark:text-amber-400',
     bgColor: 'bg-amber-500/10',
     borderColor: 'border-amber-500/30',
-    description: 'Compras, cotizaciones y gastos',
+    description: 'Compras, cotizaciones y facturas',
     welcomeMessage: '¡Hola! Estoy en modo Finanzas 💰\n\n' +
       'Puedo ayudarte a:\n' +
+      '- 📎 Subir facturas (PDF o fotos) - usa el botón ⬆️\n' +
       '- Registrar y consultar compras\n' +
       '- Manejar cotizaciones\n' +
       '- Ver resumen de gastos\n' +
       '- Analizar compras por mes/proveedor\n\n' +
+      '💡 Tip: Sube una foto de tu factura y extraeré los datos automáticamente.\n\n' +
       'Ejemplo: "Registra compra de $5,000 en Home Depot, materiales de plomeria"',
     quickActions: [
       { label: 'Resumen finanzas', prompt: 'Dame un resumen completo de finanzas: compras, cotizaciones y gastos', icon: BarChart3 },
@@ -101,10 +106,10 @@ const modeConfigs: Record<AIMode, ModeConfig> = {
       { label: 'Ultimas compras', prompt: 'Muestrame las ultimas 10 compras registradas', icon: Receipt },
     ],
     examples: [
+      { text: '📎 Sube una factura con el botón ⬆️', icon: Upload, color: 'text-amber-500' },
       { text: '"Registra compra de $3,500 en Truper"', icon: ShoppingCart, color: 'text-green-500' },
       { text: '"Nueva cotizacion de $8,000 de CEMEX"', icon: FileText, color: 'text-blue-500' },
-      { text: '"Aprueba la cotizacion de Truper"', icon: Receipt, color: 'text-purple-500' },
-      { text: '"Cuanto gastamos en enero?"', icon: DollarSign, color: 'text-amber-500' },
+      { text: '"Cuanto gastamos en enero?"', icon: DollarSign, color: 'text-purple-500' },
     ],
   },
   deliveries: {
@@ -153,8 +158,10 @@ export default function TonnyAIPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
@@ -409,6 +416,105 @@ export default function TonnyAIPage() {
       localStorage.removeItem(STORAGE_KEY_PREFIX + currentMode)
     } catch (error) {
       console.error('Error clearing chat history:', error)
+    }
+  }
+
+  // Función para subir archivos (facturas PDF/imágenes)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Resetear input para permitir subir el mismo archivo
+    e.target.value = ''
+
+    // Verificar tipo de archivo
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic']
+    if (!validTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.pdf')) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '❌ Solo puedo procesar archivos PDF o imágenes (JPG, PNG, WebP).',
+          timestamp: new Date(),
+        },
+      ])
+      return
+    }
+
+    // Agregar mensaje del usuario
+    const userMessage: Message = {
+      role: 'user',
+      content: `📎 Subiendo factura: ${file.name}`,
+      timestamp: new Date(),
+    }
+    setMessages((prev) => [...prev, userMessage])
+    setIsUploadingFile(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/invoices', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al subir archivo')
+      }
+
+      // Construir mensaje de respuesta
+      let responseContent = '✅ **Factura procesada correctamente**\n\n'
+
+      if (data.extractedData) {
+        const ed = data.extractedData
+        responseContent += `📊 **Datos extraídos:**\n`
+        responseContent += `- **Categoría:** ${ed.category || 'No detectada'}\n`
+        responseContent += `- **Proveedor:** ${ed.supplier || 'No detectado'}\n`
+        responseContent += `- **No. Factura:** ${ed.invoice_number || 'No detectado'}\n`
+        responseContent += `- **Fecha:** ${ed.invoice_date || 'No detectada'}\n`
+        responseContent += `- **Subtotal:** ${ed.subtotal ? `$${ed.subtotal.toLocaleString()}` : 'No detectado'}\n`
+        responseContent += `- **IVA:** ${ed.tax ? `$${ed.tax.toLocaleString()}` : 'No detectado'}\n`
+        responseContent += `- **Total:** ${ed.total ? `$${ed.total.toLocaleString()} ${ed.currency}` : 'No detectado'}\n`
+
+        if (ed.items && ed.items.length > 0) {
+          responseContent += `- **Items:** ${ed.items.length} productos\n`
+        }
+      }
+
+      if (data.purchase) {
+        responseContent += `\n🛒 **Compra registrada** con ID: ${data.purchase.id.slice(0, 8)}...\n`
+        responseContent += `Puedes verla en Finanzas > Registro de Compras`
+      } else if (data.invoice) {
+        responseContent += `\n📄 **Factura guardada** (categoría: ${data.extractedData?.category || 'finanzas'})`
+      }
+
+      if (data.file) {
+        responseContent += `\n\n🔗 [Ver archivo](${data.file})`
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: responseContent,
+          timestamp: new Date(),
+        },
+      ])
+    } catch (error) {
+      console.error('Error uploading file:', error)
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `❌ Error al procesar la factura: ${error instanceof Error ? error.message : 'Error desconocido'}`,
+          timestamp: new Date(),
+        },
+      ])
+    } finally {
+      setIsUploadingFile(false)
     }
   }
 
@@ -674,11 +780,32 @@ export default function TonnyAIPage() {
                 {/* Voice Button */}
                 <button
                   onClick={startRecording}
-                  disabled={isLoading || isTranscribing}
+                  disabled={isLoading || isTranscribing || isUploadingFile}
                   className={`h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center transition-all shadow-sm bg-card border hover:${currentConfig.borderColor} ${currentConfig.borderColor.replace('border-', 'hover:text-').replace('/30', '')} disabled:opacity-50`}
                   title="Grabar mensaje de voz"
                 >
                   <Mic size={20} />
+                </button>
+
+                {/* File Upload Button */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading || isTranscribing || isUploadingFile}
+                  className={`h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center transition-all shadow-sm bg-card border hover:border-amber-500/50 hover:text-amber-500 disabled:opacity-50 ${isUploadingFile ? 'animate-pulse bg-amber-50 dark:bg-amber-900/20' : ''}`}
+                  title="Subir factura (PDF o imagen)"
+                >
+                  {isUploadingFile ? (
+                    <Loader2 size={20} className="animate-spin text-amber-500" />
+                  ) : (
+                    <Upload size={20} />
+                  )}
                 </button>
 
                 {/* Text Input */}
@@ -690,13 +817,13 @@ export default function TonnyAIPage() {
                   onKeyDown={handleKeyDown}
                   placeholder={`Pregunta sobre ${currentConfig.name.toLowerCase()}...`}
                   className={`flex-1 h-12 px-4 bg-card text-foreground rounded-xl border outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500`}
-                  disabled={isLoading || isTranscribing}
+                  disabled={isLoading || isTranscribing || isUploadingFile}
                 />
 
                 {/* Send Button */}
                 <Button
                   onClick={() => sendMessage()}
-                  disabled={!input.trim() || isLoading}
+                  disabled={!input.trim() || isLoading || isUploadingFile}
                   className="h-12 w-12 flex-shrink-0 p-0"
                 >
                   <Send size={20} />
