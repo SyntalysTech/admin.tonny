@@ -30,6 +30,9 @@ import {
   Clock,
   XCircle,
 } from 'lucide-react'
+import InvoiceUploader from '@/components/Finanzas/InvoiceUploader'
+import InvoicePreviewModal from '@/components/Finanzas/InvoicePreviewModal'
+import { useEffect } from 'react'
 
 const statusOptions = [
   { value: 'pendiente', label: 'Pendiente' },
@@ -46,6 +49,8 @@ const paymentOptions = [
 
 export default function RegistroComprasPage() {
   const { purchases, isLoading, fetchPurchases, addPurchase, updatePurchase, deletePurchase } = usePurchases()
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -216,12 +221,20 @@ export default function RegistroComprasPage() {
       {/* Main Card */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <CardTitle>Listado de Compras</CardTitle>
-            <Button onClick={openCreateModal} className="w-full sm:w-auto">
-              <Plus size={18} />
-              Nueva Compra
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={openCreateModal} className="w-full sm:w-auto">
+                <Plus size={18} />
+                Nueva Compra
+              </Button>
+              {/* Invoice uploader */}
+              <div className="hidden sm:block">
+                {/* dynamic import avoided for simplicity */}
+                {/* @ts-ignore */}
+                <InvoiceUploader />
+              </div>
+            </div>
           </div>
         </CardHeader>
 
@@ -303,6 +316,29 @@ export default function RegistroComprasPage() {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-end gap-2">
+                            {/* Show invoice link if present in notes */}
+                            {(() => {
+                              try {
+                                const notesObj = purchase.notes ? JSON.parse(purchase.notes as any) : null
+                                if (notesObj && notesObj.file_url) {
+                                  return (
+                                    <button
+                                      onClick={() => {
+                                        setPreviewUrl(notesObj.file_url)
+                                        setIsPreviewOpen(true)
+                                      }}
+                                      className="p-2 rounded-lg hover:bg-muted transition-colors text-gray-500 dark:text-gray-400 hover:text-primary"
+                                    >
+                                      Ver factura
+                                    </button>
+                                  )
+                                }
+                              } catch {
+                                /* ignore */
+                              }
+                              return null
+                            })()}
+
                             <button
                               onClick={() => openEditModal(purchase)}
                               className="p-2 rounded-lg hover:bg-muted transition-colors text-gray-500 dark:text-gray-400 hover:text-primary"
@@ -372,6 +408,8 @@ export default function RegistroComprasPage() {
           )}
         </CardContent>
       </Card>
+
+      <InvoicePreviewModal url={previewUrl} isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} />
 
       {/* Create/Edit Modal */}
       <Modal
