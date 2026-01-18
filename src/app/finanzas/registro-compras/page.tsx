@@ -33,6 +33,8 @@ import {
 import InvoiceUploader from '@/components/Finanzas/InvoiceUploader'
 import InvoicePreviewModal from '@/components/Finanzas/InvoicePreviewModal'
 import InvoiceAIResultModal from '@/components/Finanzas/InvoiceAIResultModal'
+import InvoiceDataTable from '@/components/Finanzas/InvoiceDataTable'
+import type { Invoice } from '@/types/database'
 import { useEffect } from 'react'
 
 const statusOptions = [
@@ -55,6 +57,8 @@ export default function RegistroComprasPage() {
   const [invoiceMap, setInvoiceMap] = useState<Record<string, any>>({})
   const [aiModalData, setAiModalData] = useState<any>(null)
   const [isAiModalOpen, setIsAiModalOpen] = useState(false)
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const [isInvoiceDataOpen, setIsInvoiceDataOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -362,17 +366,35 @@ export default function RegistroComprasPage() {
 
                                     {invoice && (
                                       <>
-                                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-900 text-gray-700">
-                                          IA: {invoice.status}
+                                        <span className={`text-xs px-2 py-1 rounded-full ${
+                                          invoice.status === 'done' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                                          invoice.status === 'processing' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' :
+                                          invoice.status === 'error' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' :
+                                          'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-400'
+                                        }`}>
+                                          {invoice.status === 'done' ? 'Procesado' :
+                                           invoice.status === 'processing' ? 'Procesando...' :
+                                           invoice.status === 'error' ? 'Error' : 'Pendiente'}
                                         </span>
+                                        <button
+                                          onClick={() => {
+                                            setSelectedInvoice(invoice)
+                                            setIsInvoiceDataOpen(true)
+                                          }}
+                                          className="p-2 rounded-lg hover:bg-muted transition-colors text-primary hover:text-primary/80 font-medium text-sm"
+                                          title="Ver datos extraídos"
+                                        >
+                                          Ver datos
+                                        </button>
                                         <button
                                           onClick={() => {
                                             setAiModalData(invoice.ai_response)
                                             setIsAiModalOpen(true)
                                           }}
-                                          className="p-2 rounded-lg hover:bg-muted transition-colors text-gray-500 dark:text-gray-400 hover:text-primary"
+                                          className="p-2 rounded-lg hover:bg-muted transition-colors text-gray-500 dark:text-gray-400 hover:text-primary text-sm"
+                                          title="Ver respuesta IA"
                                         >
-                                          Ver IA
+                                          IA
                                         </button>
                                       </>
                                     )}
@@ -455,6 +477,16 @@ export default function RegistroComprasPage() {
 
       <InvoicePreviewModal url={previewUrl} isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} />
       <InvoiceAIResultModal aiResponse={aiModalData} isOpen={isAiModalOpen} onClose={() => setIsAiModalOpen(false)} />
+      {selectedInvoice && (
+        <InvoiceDataTable
+          invoice={selectedInvoice}
+          isOpen={isInvoiceDataOpen}
+          onClose={() => {
+            setIsInvoiceDataOpen(false)
+            setSelectedInvoice(null)
+          }}
+        />
+      )}
 
       {/* Create/Edit Modal */}
       <Modal

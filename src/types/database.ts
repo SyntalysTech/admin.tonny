@@ -72,6 +72,42 @@ export interface Quote {
   created_at: string
 }
 
+export type InvoiceStatus = 'pending' | 'processing' | 'done' | 'error'
+export type InvoiceCategory = 'compras' | 'finanzas' | 'gastos'
+
+export interface InvoiceItem {
+  sku?: string
+  description: string
+  quantity: number
+  unit_price: number
+  total: number
+}
+
+export interface Invoice {
+  id: string
+  purchase_id?: string
+  file_path?: string
+  public_url?: string
+  file_name?: string
+  mime_type?: string
+  extracted_text?: string
+  status?: InvoiceStatus
+  ai_response?: any
+  processed_at?: string
+  // Campos estructurados
+  supplier?: string
+  invoice_number?: string
+  invoice_date?: string
+  subtotal?: number
+  tax?: number
+  total?: number
+  currency?: string
+  payment_method?: string
+  category?: InvoiceCategory
+  items?: InvoiceItem[]
+  created_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -99,6 +135,11 @@ export interface Database {
         Row: Quote
         Insert: Omit<Quote, 'id' | 'created_at'>
         Update: Partial<Omit<Quote, 'id' | 'created_at'>>
+      }
+      invoices: {
+        Row: Invoice
+        Insert: Omit<Invoice, 'id' | 'created_at'>
+        Update: Partial<Omit<Invoice, 'id' | 'created_at'>>
       }
     }
   }
