@@ -41,7 +41,7 @@ export default function LoginPage() {
 
   return (
     <PublicRoute>
-      <div className="min-h-screen bg-background flex">
+      <div className="min-h-screen bg-background flex pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {/* Left Side - Form */}
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="w-full max-w-md">

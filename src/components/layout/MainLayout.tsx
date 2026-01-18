@@ -23,11 +23,11 @@ export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
 
         <main
           className={cn(
-            // Responsive top padding for header
-            'pt-14 sm:pt-16 min-h-screen transition-all duration-300',
+            // Responsive top padding for header + safe area (notch)
+            'pt-[calc(4rem+env(safe-area-inset-top))] min-h-screen transition-all duration-300',
             // Sidebar spacing
             isCollapsed ? 'lg:pl-[72px]' : 'lg:pl-64',
-            // iOS safe area at bottom
+            // iOS safe area at bottom (home indicator)
             'pb-[env(safe-area-inset-bottom)]'
           )}
         >

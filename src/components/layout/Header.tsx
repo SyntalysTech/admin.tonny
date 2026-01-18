@@ -48,7 +48,8 @@ export function Header({ title, subtitle }: HeaderProps) {
   return (
     <header
       className={cn(
-        'fixed top-0 right-0 h-16 flex items-center justify-between px-4 md:px-6 z-30 transition-all duration-300',
+        'fixed top-0 right-0 flex items-center justify-between px-4 md:px-6 z-30 transition-all duration-300',
+        'pt-[env(safe-area-inset-top)] h-[calc(4rem+env(safe-area-inset-top))]',
         isDark
           ? 'bg-gray-900 border-b border-gray-700'
           : 'bg-white border-b border-border',
@@ -148,7 +149,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                 onClick={() => setShowNotifications(false)}
               />
               <div className={cn(
-                'fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-16 sm:top-full sm:mt-2 sm:w-96 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden',
+                'fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-[calc(4rem+env(safe-area-inset-top))] sm:top-full sm:mt-2 sm:w-96 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden',
                 isDark
                   ? 'bg-gray-800 border border-gray-700'
                   : 'bg-white border border-border'
