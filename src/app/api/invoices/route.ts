@@ -3,6 +3,29 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import pdfParse from 'pdf-parse'
 import { createWorker } from 'tesseract.js'
 
+export async function GET(request: Request) {
+  try {
+    const supabase = await createSupabaseServerClient()
+    const url = new URL(request.url)
+    const purchaseIdsParam = url.searchParams.get('purchase_ids')
+
+    let query = supabase.from('invoices').select('*')
+    if (purchaseIdsParam) {
+      const ids = purchaseIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
+      query = query.in('purchase_id', ids)
+    } else {
+      query = query.order('created_at', { ascending: false }).limit(50)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error('Invoices GET error', err)
+    return NextResponse.json({ error: 'Error fetching invoices' }, { status: 500 })
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData()
@@ -134,10 +157,13 @@ export async function POST(request: Request) {
     }
 
     // Update invoice with purchase_id
-    await supabase.from('invoices').update({ purchase_id: insertedPurchase.id }).eq('id', invoiceInserted.id)
+    await supabase.from('invoices').update({ purchase_id: insertedPurchase.id, status: 'pending' }).eq('id', invoiceInserted.id)
 
     // Notify TonnyAI to refine/assign fields and update the purchase if needed
     try {
+      // mark as processing
+      await supabase.from('invoices').update({ status: 'processing' }).eq('id', invoiceInserted.id)
+
       const tonnyRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/tonny-ai`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,11 +178,14 @@ export async function POST(request: Request) {
         }),
       })
 
-      // ignore TonnyAI response for now, but log if useful
       const tonnyJson = await tonnyRes.json().catch(() => null)
       console.log('TonnyAI notified for invoice', tonnyJson)
+
+      // save AI response and mark done
+      await supabase.from('invoices').update({ ai_response: tonnyJson || null, processed_at: new Date().toISOString(), status: 'done' }).eq('id', invoiceInserted.id)
     } catch (err) {
       console.warn('Failed to notify TonnyAI', err)
+      await supabase.from('invoices').update({ ai_response: JSON.stringify({ error: String(err) }), processed_at: new Date().toISOString(), status: 'error' }).eq('id', invoiceInserted.id)
     }
 
     return NextResponse.json({ invoice: invoiceInserted, inserted: insertedPurchase, file: publicUrl, extractedText })

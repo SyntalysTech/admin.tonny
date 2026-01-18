@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import InvoiceUploader from '@/components/Finanzas/InvoiceUploader'
 import InvoicePreviewModal from '@/components/Finanzas/InvoicePreviewModal'
+import InvoiceAIResultModal from '@/components/Finanzas/InvoiceAIResultModal'
 import { useEffect } from 'react'
 
 const statusOptions = [
@@ -51,12 +52,38 @@ export default function RegistroComprasPage() {
   const { purchases, isLoading, fetchPurchases, addPurchase, updatePurchase, deletePurchase } = usePurchases()
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const [invoiceMap, setInvoiceMap] = useState<Record<string, any>>({})
+  const [aiModalData, setAiModalData] = useState<any>(null)
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Fetch invoices linked to current purchases to show AI status
+  useEffect(() => {
+    async function loadInvoices() {
+      try {
+        const ids = purchases.map((p) => p.id).join(',')
+        if (!ids) return
+        const res = await fetch(`/api/invoices?purchase_ids=${ids}`)
+        const data = await res.json()
+        if (Array.isArray(data)) {
+          const map: Record<string, any> = {}
+          data.forEach((inv) => {
+            if (inv.purchase_id) map[inv.purchase_id] = inv
+          })
+          setInvoiceMap(map)
+        }
+      } catch (err) {
+        console.error('Failed to load invoices', err)
+      }
+    }
+
+    loadInvoices()
+  }, [purchases])
 
   const [formData, setFormData] = useState({
     supplier: '',
@@ -318,23 +345,42 @@ export default function RegistroComprasPage() {
                             {(() => {
                               try {
                                 const notesObj = purchase.notes ? JSON.parse(purchase.notes as any) : null
-                                if (notesObj && notesObj.file_url) {
-                                  return (
-                                    <button
-                                      onClick={() => {
-                                        setPreviewUrl(notesObj.file_url)
-                                        setIsPreviewOpen(true)
-                                      }}
-                                      className="p-2 rounded-lg hover:bg-muted transition-colors text-gray-500 dark:text-gray-400 hover:text-primary"
-                                    >
-                                      Ver factura
-                                    </button>
-                                  )
-                                }
+                                const invoice = invoiceMap[purchase.id]
+                                return (
+                                  <div className="flex items-center gap-2">
+                                    {notesObj && notesObj.file_url && (
+                                      <button
+                                        onClick={() => {
+                                          setPreviewUrl(notesObj.file_url)
+                                          setIsPreviewOpen(true)
+                                        }}
+                                        className="p-2 rounded-lg hover:bg-muted transition-colors text-gray-500 dark:text-gray-400 hover:text-primary"
+                                      >
+                                        Ver factura
+                                      </button>
+                                    )}
+
+                                    {invoice && (
+                                      <>
+                                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-900 text-gray-700">
+                                          IA: {invoice.status}
+                                        </span>
+                                        <button
+                                          onClick={() => {
+                                            setAiModalData(invoice.ai_response)
+                                            setIsAiModalOpen(true)
+                                          }}
+                                          className="p-2 rounded-lg hover:bg-muted transition-colors text-gray-500 dark:text-gray-400 hover:text-primary"
+                                        >
+                                          Ver IA
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                )
                               } catch {
-                                /* ignore */
+                                return null
                               }
-                              return null
                             })()}
 
                             <button
@@ -408,6 +454,7 @@ export default function RegistroComprasPage() {
       </Card>
 
       <InvoicePreviewModal url={previewUrl} isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} />
+      <InvoiceAIResultModal aiResponse={aiModalData} isOpen={isAiModalOpen} onClose={() => setIsAiModalOpen(false)} />
 
       {/* Create/Edit Modal */}
       <Modal
