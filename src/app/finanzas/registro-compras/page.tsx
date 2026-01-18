@@ -229,9 +229,7 @@ export default function RegistroComprasPage() {
                 Nueva Compra
               </Button>
               {/* Invoice uploader */}
-              <div className="hidden sm:block">
-                {/* dynamic import avoided for simplicity */}
-                {/* @ts-ignore */}
+              <div>
                 <InvoiceUploader />
               </div>
             </div>

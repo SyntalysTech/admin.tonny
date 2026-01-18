@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { usePurchases } from '@/hooks/useFinanzas'
 
 export function InvoiceUploader() {
@@ -34,12 +33,12 @@ export function InvoiceUploader() {
 
   return (
     <div className="flex items-center gap-2">
-      <label className="w-52">
-        <Input
-          type="file"
-          onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-        />
-      </label>
+      <input
+        className="block w-52 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary"
+        type="file"
+        accept="application/pdf,image/*"
+        onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+      />
       <Button onClick={handleUpload} isLoading={isUploading} disabled={!file}>
         Subir factura
       </Button>
