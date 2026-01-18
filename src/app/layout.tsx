@@ -30,10 +30,12 @@ export const metadata: Metadata = {
     title: 'Admin Tonny',
   },
   icons: {
-    icon: "/logos/logo-favicon-64x64.png",
+    icon: "/logos/icono-webapp-64x64.png",
     apple: [
-      { url: '/logos/logo-icon-alone-green-512x512.png', sizes: '512x512', type: 'image/png' },
-      { url: '/logos/logo-icon-alone-green-512x512.png', sizes: '180x180', type: 'image/png' },
+      { url: '/logos/icono-webapp-180x180.png', sizes: '180x180', type: 'image/png' },
+      { url: '/logos/icono-webapp-152x152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/logos/icono-webapp-144x144.png', sizes: '144x144', type: 'image/png' },
+      { url: '/logos/icono-webapp-128x128.png', sizes: '128x128', type: 'image/png' },
     ],
   },
 };
