@@ -21,6 +21,11 @@ import {
   BarChart3,
   PlusCircle,
   MinusCircle,
+  Truck,
+  ShoppingCart,
+  Receipt,
+  Boxes,
+  ArrowRightLeft,
 } from 'lucide-react'
 
 interface Message {
@@ -29,47 +34,121 @@ interface Message {
   timestamp: Date
 }
 
-const STORAGE_KEY = 'tonny-ai-chat-history'
-const WELCOME_MESSAGE: Message = {
-  role: 'assistant',
-  content: '¡Hola! Soy TonnyAI 🤖 Tu asistente de gestion.\n\n' +
-    'Puedo ayudarte con:\n\n' +
-    '📦 Inventario\n' +
-    '- "Agrega 20 galones de pintura blanca"\n' +
-    '- "Dame 5 tubos a Jordi"\n' +
-    '- "Cuantas brochas hay?"\n\n' +
-    '💰 Compras y Cotizaciones\n' +
-    '- "Registra compra de $3,500 en Home Depot"\n' +
-    '- "Nueva cotizacion de Truper por $8,000"\n' +
-    '- "Cuanto hemos gastado este mes?"\n\n' +
-    '¡Habla o escribe, estoy listo!',
-  timestamp: new Date(),
+type AIMode = 'inventory' | 'finance' | 'deliveries'
+
+interface ModeConfig {
+  id: AIMode
+  name: string
+  emoji: string
+  color: string
+  bgColor: string
+  borderColor: string
+  description: string
+  welcomeMessage: string
+  quickActions: { label: string; prompt: string; icon: React.ElementType }[]
+  examples: { text: string; icon: React.ElementType; color: string }[]
 }
 
-// Acciones rápidas organizadas por categoría
-const quickActionsInventory = [
-  { label: 'Resumen inventario', prompt: 'Dame un resumen del inventario', icon: Package },
-  { label: 'Stock bajo', prompt: 'Que productos tienen stock bajo?', icon: TrendingDown },
-  { label: 'Movimientos recientes', prompt: 'Muestrame los ultimos 10 movimientos de stock', icon: ClipboardList },
-]
+const modeConfigs: Record<AIMode, ModeConfig> = {
+  inventory: {
+    id: 'inventory',
+    name: 'Inventario',
+    emoji: '📦',
+    color: 'text-emerald-600 dark:text-emerald-400',
+    bgColor: 'bg-emerald-500/10',
+    borderColor: 'border-emerald-500/30',
+    description: 'Gestiona productos, stock y movimientos',
+    welcomeMessage: '¡Hola! Estoy en modo Inventario 📦\n\n' +
+      'Puedo ayudarte a:\n' +
+      '- Agregar y editar productos\n' +
+      '- Registrar entradas y salidas de stock\n' +
+      '- Consultar niveles de inventario\n' +
+      '- Ver productos con stock bajo\n' +
+      '- Registrar movimientos\n\n' +
+      'Ejemplo: "Agrega 30 paneles de vinilo, cada uno tiene 12 pies"',
+    quickActions: [
+      { label: 'Resumen inventario', prompt: 'Dame un resumen completo del inventario', icon: Package },
+      { label: 'Stock bajo', prompt: 'Que productos tienen stock bajo? Muestra todos', icon: TrendingDown },
+      { label: 'Movimientos recientes', prompt: 'Muestrame los ultimos 15 movimientos de stock', icon: ClipboardList },
+      { label: 'Por categoria', prompt: 'Cuantos productos hay por cada categoria?', icon: Boxes },
+    ],
+    examples: [
+      { text: '"Agrega 20 galones de pintura Bear"', icon: PlusCircle, color: 'text-green-500' },
+      { text: '"Quita 5 tubos del inventario"', icon: MinusCircle, color: 'text-orange-500' },
+      { text: '"Cuanta pintura blanca hay?"', icon: Package, color: 'text-blue-500' },
+      { text: '"Actualiza el precio del cemento a $150"', icon: ArrowRightLeft, color: 'text-purple-500' },
+    ],
+  },
+  finance: {
+    id: 'finance',
+    name: 'Finanzas',
+    emoji: '💰',
+    color: 'text-amber-600 dark:text-amber-400',
+    bgColor: 'bg-amber-500/10',
+    borderColor: 'border-amber-500/30',
+    description: 'Compras, cotizaciones y gastos',
+    welcomeMessage: '¡Hola! Estoy en modo Finanzas 💰\n\n' +
+      'Puedo ayudarte a:\n' +
+      '- Registrar y consultar compras\n' +
+      '- Manejar cotizaciones\n' +
+      '- Ver resumen de gastos\n' +
+      '- Analizar compras por mes/proveedor\n\n' +
+      'Ejemplo: "Registra compra de $5,000 en Home Depot, materiales de plomeria"',
+    quickActions: [
+      { label: 'Resumen finanzas', prompt: 'Dame un resumen completo de finanzas: compras, cotizaciones y gastos', icon: BarChart3 },
+      { label: 'Compras del mes', prompt: 'Cuanto hemos gastado este mes? Muestra el desglose por proveedor', icon: ShoppingCart },
+      { label: 'Cotizaciones pendientes', prompt: 'Que cotizaciones tenemos pendientes? Muestra todas', icon: FileText },
+      { label: 'Ultimas compras', prompt: 'Muestrame las ultimas 10 compras registradas', icon: Receipt },
+    ],
+    examples: [
+      { text: '"Registra compra de $3,500 en Truper"', icon: ShoppingCart, color: 'text-green-500' },
+      { text: '"Nueva cotizacion de $8,000 de CEMEX"', icon: FileText, color: 'text-blue-500' },
+      { text: '"Aprueba la cotizacion de Truper"', icon: Receipt, color: 'text-purple-500' },
+      { text: '"Cuanto gastamos en enero?"', icon: DollarSign, color: 'text-amber-500' },
+    ],
+  },
+  deliveries: {
+    id: 'deliveries',
+    name: 'Entregas',
+    emoji: '🚚',
+    color: 'text-blue-600 dark:text-blue-400',
+    bgColor: 'bg-blue-500/10',
+    borderColor: 'border-blue-500/30',
+    description: 'Entregas a Jordi, Gustavo, David, Taurus',
+    welcomeMessage: '¡Hola! Estoy en modo Entregas 🚚\n\n' +
+      'Puedo ayudarte a:\n' +
+      '- Ver entregas por responsable\n' +
+      '- Registrar nuevas entregas\n' +
+      '- Modificar o añadir notas a entregas\n' +
+      '- Ver historial de entregas\n\n' +
+      'Responsables: Jordi, Gustavo, David, Taurus\n\n' +
+      'Ejemplo: "Dame 5 tubos de cobre a Jordi"',
+    quickActions: [
+      { label: 'Entregas a Jordi', prompt: 'Muestrame todas las entregas a Jordi de este mes', icon: Users },
+      { label: 'Entregas a Gustavo', prompt: 'Muestrame todas las entregas a Gustavo de este mes', icon: Users },
+      { label: 'Entregas a David', prompt: 'Muestrame todas las entregas a David de este mes', icon: Users },
+      { label: 'Entregas a Taurus', prompt: 'Muestrame todas las entregas a Taurus de este mes', icon: Users },
+    ],
+    examples: [
+      { text: '"Entrega 3 taladros a Gustavo"', icon: Truck, color: 'text-blue-500' },
+      { text: '"Que le dimos a David esta semana?"', icon: Users, color: 'text-purple-500' },
+      { text: '"Añade nota: material urgente"', icon: FileText, color: 'text-amber-500' },
+      { text: '"Dame 10 bolsas de cemento a Jordi"', icon: MinusCircle, color: 'text-orange-500' },
+    ],
+  },
+}
 
-const quickActionsFinance = [
-  { label: 'Resumen finanzas', prompt: 'Dame un resumen de finanzas: compras y cotizaciones', icon: BarChart3 },
-  { label: 'Compras del mes', prompt: 'Cuanto hemos gastado este mes en compras?', icon: DollarSign },
-  { label: 'Cotizaciones pendientes', prompt: 'Que cotizaciones tenemos pendientes?', icon: FileText },
-]
-
-const quickActionsDeliveries = [
-  { label: 'Entregas a Jordi', prompt: 'Muestrame las entregas a Jordi', icon: Users },
-  { label: 'Entregas a Gustavo', prompt: 'Muestrame las entregas a Gustavo', icon: Users },
-  { label: 'Entregas a David', prompt: 'Muestrame las entregas a David', icon: Users },
-  { label: 'Entregas a Taurus', prompt: 'Muestrame las entregas a Taurus', icon: Users },
-]
+const STORAGE_KEY_PREFIX = 'tonny-ai-chat-'
+const MODE_STORAGE_KEY = 'tonny-ai-current-mode'
 
 export default function TonnyAIPage() {
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
+  const [currentMode, setCurrentMode] = useState<AIMode>('inventory')
+  const [conversations, setConversations] = useState<Record<AIMode, Message[]>>({
+    inventory: [],
+    finance: [],
+    deliveries: [],
+  })
   const [isHydrated, setIsHydrated] = useState(false)
-  const [activeSection, setActiveSection] = useState<'inventory' | 'finance' | 'deliveries'>('inventory')
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
@@ -79,41 +158,79 @@ export default function TonnyAIPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
+  const currentConfig = modeConfigs[currentMode]
+  const messages = conversations[currentMode]
+
+  const getWelcomeMessage = (mode: AIMode): Message => ({
+    role: 'assistant',
+    content: modeConfigs[mode].welcomeMessage,
+    timestamp: new Date(),
+  })
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // Cargar historial de localStorage al montar
+  // Cargar conversaciones de localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        // Convertir timestamps de string a Date
-        const messagesWithDates = parsed.map((m: Message & { timestamp: string }) => ({
-          ...m,
-          timestamp: new Date(m.timestamp)
-        }))
-        if (messagesWithDates.length > 0) {
-          setMessages(messagesWithDates)
-        }
+      // Cargar modo actual
+      const savedMode = localStorage.getItem(MODE_STORAGE_KEY) as AIMode | null
+      if (savedMode && modeConfigs[savedMode]) {
+        setCurrentMode(savedMode)
       }
+
+      // Cargar conversaciones de cada modo
+      const loadedConversations: Record<AIMode, Message[]> = {
+        inventory: [],
+        finance: [],
+        deliveries: [],
+      }
+
+      Object.keys(modeConfigs).forEach((mode) => {
+        const saved = localStorage.getItem(STORAGE_KEY_PREFIX + mode)
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          const messagesWithDates = parsed.map((m: Message & { timestamp: string }) => ({
+            ...m,
+            timestamp: new Date(m.timestamp)
+          }))
+          loadedConversations[mode as AIMode] = messagesWithDates.length > 0 ? messagesWithDates : [getWelcomeMessage(mode as AIMode)]
+        } else {
+          loadedConversations[mode as AIMode] = [getWelcomeMessage(mode as AIMode)]
+        }
+      })
+
+      setConversations(loadedConversations)
     } catch (error) {
       console.error('Error loading chat history:', error)
+      // Inicializar con mensajes de bienvenida
+      setConversations({
+        inventory: [getWelcomeMessage('inventory')],
+        finance: [getWelcomeMessage('finance')],
+        deliveries: [getWelcomeMessage('deliveries')],
+      })
     }
     setIsHydrated(true)
   }, [])
 
-  // Guardar mensajes en localStorage cuando cambien (después de hidratar)
+  // Guardar conversación actual cuando cambie
   useEffect(() => {
     if (isHydrated && messages.length > 0) {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+        localStorage.setItem(STORAGE_KEY_PREFIX + currentMode, JSON.stringify(messages))
       } catch (error) {
         console.error('Error saving chat history:', error)
       }
     }
-  }, [messages, isHydrated])
+  }, [messages, isHydrated, currentMode])
+
+  // Guardar modo actual
+  useEffect(() => {
+    if (isHydrated) {
+      localStorage.setItem(MODE_STORAGE_KEY, currentMode)
+    }
+  }, [currentMode, isHydrated])
 
   useEffect(() => {
     scrollToBottom()
@@ -121,7 +238,21 @@ export default function TonnyAIPage() {
 
   useEffect(() => {
     inputRef.current?.focus()
-  }, [])
+  }, [currentMode])
+
+  const setMessages = (updater: (prev: Message[]) => Message[]) => {
+    setConversations(prev => ({
+      ...prev,
+      [currentMode]: updater(prev[currentMode])
+    }))
+  }
+
+  const switchMode = (newMode: AIMode) => {
+    if (newMode !== currentMode) {
+      setCurrentMode(newMode)
+      setInput('')
+    }
+  }
 
   const sendMessage = useCallback(async (messageText?: string) => {
     const textToSend = messageText || input.trim()
@@ -148,6 +279,7 @@ export default function TonnyAIPage() {
             role: m.role,
             content: m.content,
           })),
+          mode: currentMode,
         }),
         signal: controller.signal,
       })
@@ -190,7 +322,7 @@ export default function TonnyAIPage() {
       setIsLoading(false)
       inputRef.current?.focus()
     }
-  }, [input, isLoading, messages])
+  }, [input, isLoading, messages, currentMode])
 
   // Funciones de grabación de voz
   const startRecording = async () => {
@@ -229,10 +361,8 @@ export default function TonnyAIPage() {
 
   const cancelRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      // Desconectar el handler onstop para que no transcriba
       mediaRecorderRef.current.onstop = null
       mediaRecorderRef.current.stop()
-      // Detener todos los tracks del stream
       mediaRecorderRef.current.stream?.getTracks().forEach(track => track.stop())
       setIsRecording(false)
       audioChunksRef.current = []
@@ -253,7 +383,6 @@ export default function TonnyAIPage() {
       const data = await response.json()
 
       if (data.text) {
-        // Enviar directamente el mensaje transcrito
         sendMessage(data.text)
       } else {
         throw new Error('No se pudo transcribir el audio')
@@ -274,15 +403,10 @@ export default function TonnyAIPage() {
   }
 
   const clearChat = () => {
-    const resetMessage: Message = {
-      role: 'assistant',
-      content: '🔄 Chat reiniciado. ¿Que necesitas?',
-      timestamp: new Date(),
-    }
-    setMessages([resetMessage])
-    // Limpiar localStorage
+    const resetMessage = getWelcomeMessage(currentMode)
+    setMessages(() => [resetMessage])
     try {
-      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem(STORAGE_KEY_PREFIX + currentMode)
     } catch (error) {
       console.error('Error clearing chat history:', error)
     }
@@ -305,136 +429,92 @@ export default function TonnyAIPage() {
         {/* Sidebar - Hidden on mobile */}
         <div className="hidden lg:block lg:w-80 flex-shrink-0">
           <Card className="h-full overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-border bg-gradient-to-r from-primary/10 to-transparent">
+            {/* Header con avatar y modo */}
+            <div className={`p-4 border-b border-border bg-gradient-to-r ${currentConfig.bgColor} to-transparent`}>
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-green-600 flex items-center justify-center shadow-lg">
-                  <Bot size={28} className="text-white" />
+                <div className={`w-14 h-14 rounded-2xl ${currentConfig.bgColor} ${currentConfig.borderColor} border-2 flex items-center justify-center shadow-lg`}>
+                  <span className="text-2xl">{currentConfig.emoji}</span>
                 </div>
                 <div>
-                  <h3 className="font-bold text-foreground">TonnyAI</h3>
-                  <p className="text-xs text-muted-foreground">Tu asistente inteligente</p>
+                  <h3 className="font-bold text-foreground flex items-center gap-2">
+                    TonnyAI
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${currentConfig.bgColor} ${currentConfig.color}`}>
+                      {currentConfig.name}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-muted-foreground">{currentConfig.description}</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Mode Selector */}
+            <div className="p-3 border-b border-border">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">Modo de trabajo</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {Object.values(modeConfigs).map((config) => (
+                  <button
+                    key={config.id}
+                    onClick={() => switchMode(config.id)}
+                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl transition-all ${
+                      currentMode === config.id
+                        ? `${config.bgColor} ${config.borderColor} border-2 shadow-sm`
+                        : 'border-2 border-transparent hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="text-xl">{config.emoji}</span>
+                    <span className={`text-[10px] font-medium ${
+                      currentMode === config.id ? config.color : 'text-muted-foreground'
+                    }`}>
+                      {config.name}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
-              {/* Tabs de secciones */}
-              <div className="flex gap-1 mb-4 p-1 bg-muted rounded-lg">
-                <button
-                  onClick={() => setActiveSection('inventory')}
-                  className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
-                    activeSection === 'inventory'
-                      ? 'bg-card text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  📦 Inventario
-                </button>
-                <button
-                  onClick={() => setActiveSection('finance')}
-                  className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
-                    activeSection === 'finance'
-                      ? 'bg-card text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  💰 Finanzas
-                </button>
-                <button
-                  onClick={() => setActiveSection('deliveries')}
-                  className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
-                    activeSection === 'deliveries'
-                      ? 'bg-card text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  🚚 Entregas
-                </button>
+              {/* Acciones rapidas */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Consultas rapidas</p>
+                {currentConfig.quickActions.map((action, index) => (
+                  <button
+                    key={index}
+                    onClick={() => sendMessage(action.prompt)}
+                    disabled={isLoading || isRecording}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left disabled:opacity-50
+                      hover:${currentConfig.bgColor} hover:${currentConfig.borderColor}
+                      border-border hover:border-current`}
+                  >
+                    <div className={`w-8 h-8 rounded-lg ${currentConfig.bgColor} flex items-center justify-center`}>
+                      <action.icon size={16} className={currentConfig.color} />
+                    </div>
+                    <span className="text-sm text-foreground font-medium">{action.label}</span>
+                  </button>
+                ))}
               </div>
 
-              {/* Acciones de inventario */}
-              {activeSection === 'inventory' && (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Consultas rapidas</p>
-                  {quickActionsInventory.map((action, index) => (
-                    <button
-                      key={index}
-                      onClick={() => sendMessage(action.prompt)}
-                      disabled={isLoading || isRecording}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-primary/5 hover:border-primary/30 transition-all text-left disabled:opacity-50"
-                    >
-                      <action.icon size={18} className="text-primary flex-shrink-0" />
-                      <span className="text-sm text-foreground">{action.label}</span>
-                    </button>
+              {/* Ejemplos */}
+              <div className="mt-6">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Ejemplos</p>
+                <div className="space-y-2 bg-muted/30 p-3 rounded-xl border border-border">
+                  {currentConfig.examples.map((example, index) => (
+                    <p key={index} className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <example.icon size={14} className={`${example.color} flex-shrink-0 mt-0.5`} />
+                      <span>{example.text}</span>
+                    </p>
                   ))}
-
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-4 mb-2">Ejemplos de voz</p>
-                  <div className="space-y-1.5 text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                    <p className="flex items-center gap-2"><PlusCircle size={14} className="text-green-500" /> "Agrega 10 bolsas de cemento"</p>
-                    <p className="flex items-center gap-2"><MinusCircle size={14} className="text-orange-500" /> "Saca 3 taladros para David"</p>
-                    <p className="flex items-center gap-2"><Package size={14} className="text-blue-500" /> "Cuanto hay de pintura?"</p>
-                  </div>
                 </div>
-              )}
-
-              {/* Acciones de finanzas */}
-              {activeSection === 'finance' && (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Consultas rapidas</p>
-                  {quickActionsFinance.map((action, index) => (
-                    <button
-                      key={index}
-                      onClick={() => sendMessage(action.prompt)}
-                      disabled={isLoading || isRecording}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-primary/5 hover:border-primary/30 transition-all text-left disabled:opacity-50"
-                    >
-                      <action.icon size={18} className="text-primary flex-shrink-0" />
-                      <span className="text-sm text-foreground">{action.label}</span>
-                    </button>
-                  ))}
-
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-4 mb-2">Ejemplos de voz</p>
-                  <div className="space-y-1.5 text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                    <p className="flex items-center gap-2"><DollarSign size={14} className="text-green-500" /> "Registra compra de $5,000 en Home Depot"</p>
-                    <p className="flex items-center gap-2"><FileText size={14} className="text-blue-500" /> "Nueva cotizacion de Truper por $3,000"</p>
-                    <p className="flex items-center gap-2"><BarChart3 size={14} className="text-purple-500" /> "Cuanto gastamos en enero?"</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Acciones de entregas */}
-              {activeSection === 'deliveries' && (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Ver entregas por responsable</p>
-                  {quickActionsDeliveries.map((action, index) => (
-                    <button
-                      key={index}
-                      onClick={() => sendMessage(action.prompt)}
-                      disabled={isLoading || isRecording}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-primary/5 hover:border-primary/30 transition-all text-left disabled:opacity-50"
-                    >
-                      <action.icon size={18} className="text-primary flex-shrink-0" />
-                      <span className="text-sm text-foreground">{action.label}</span>
-                    </button>
-                  ))}
-
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-4 mb-2">Ejemplos de voz</p>
-                  <div className="space-y-1.5 text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                    <p className="flex items-center gap-2"><MinusCircle size={14} className="text-orange-500" /> "Dame 5 tubos a Jordi"</p>
-                    <p className="flex items-center gap-2"><MinusCircle size={14} className="text-orange-500" /> "Entrega 2 taladros a Gustavo"</p>
-                    <p className="flex items-center gap-2"><Users size={14} className="text-blue-500" /> "Que le hemos dado a David?"</p>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
 
+            {/* Clear button */}
             <div className="p-4 border-t border-border">
               <button
                 onClick={clearChat}
-                className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg border border-border hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400 transition-all text-sm text-muted-foreground"
+                className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-border hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400 transition-all text-sm text-muted-foreground"
               >
                 <Trash2 size={16} />
-                Limpiar chat
+                Limpiar chat de {currentConfig.name}
               </button>
             </div>
           </Card>
@@ -443,23 +523,47 @@ export default function TonnyAIPage() {
         {/* Chat Area */}
         <Card className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="px-4 sm:px-6 py-3 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
-            <div className="flex items-center gap-2">
-              <Sparkles size={18} className="text-primary" />
-              <span className="text-sm font-medium text-foreground">Chat con TonnyAI</span>
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-xs text-muted-foreground hidden sm:block">
-                  {messages.length - 1} mensajes
-                </span>
-                {/* Mobile clear button */}
-                <button
-                  onClick={clearChat}
-                  className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-all"
-                  title="Limpiar chat"
-                >
-                  <Trash2 size={16} />
-                </button>
+          <div className={`px-4 sm:px-6 py-3 border-b border-border bg-gradient-to-r ${currentConfig.bgColor} to-transparent`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl ${currentConfig.bgColor} ${currentConfig.borderColor} border flex items-center justify-center`}>
+                <span className="text-lg">{currentConfig.emoji}</span>
               </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">TonnyAI</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${currentConfig.bgColor} ${currentConfig.color} font-medium`}>
+                    {currentConfig.name}
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">{messages.length - 1} mensajes</p>
+              </div>
+
+              {/* Mobile mode switcher */}
+              <div className="flex lg:hidden items-center gap-1 bg-muted/50 rounded-lg p-1">
+                {Object.values(modeConfigs).map((config) => (
+                  <button
+                    key={config.id}
+                    onClick={() => switchMode(config.id)}
+                    className={`p-2 rounded-md transition-all ${
+                      currentMode === config.id
+                        ? `${config.bgColor} shadow-sm`
+                        : 'hover:bg-muted'
+                    }`}
+                    title={config.name}
+                  >
+                    <span className="text-sm">{config.emoji}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Clear button mobile */}
+              <button
+                onClick={clearChat}
+                className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-all"
+                title="Limpiar chat"
+              >
+                <Trash2 size={16} />
+              </button>
             </div>
           </div>
 
@@ -471,13 +575,17 @@ export default function TonnyAIPage() {
                 className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
               >
                 <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
                     message.role === 'user'
                       ? 'bg-primary text-white'
-                      : 'bg-gradient-to-br from-primary to-green-600 text-white'
+                      : `${currentConfig.bgColor} ${currentConfig.borderColor} border`
                   }`}
                 >
-                  {message.role === 'user' ? <User size={18} /> : <Bot size={18} />}
+                  {message.role === 'user' ? (
+                    <User size={18} />
+                  ) : (
+                    <span className="text-base">{currentConfig.emoji}</span>
+                  )}
                 </div>
 
                 <div className={`flex-1 max-w-[85%] ${message.role === 'user' ? 'text-right' : ''}`}>
@@ -501,8 +609,8 @@ export default function TonnyAIPage() {
 
             {(isLoading || isTranscribing) && (
               <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center flex-shrink-0">
-                  <Bot size={18} className="text-white" />
+                <div className={`w-9 h-9 rounded-xl ${currentConfig.bgColor} ${currentConfig.borderColor} border flex items-center justify-center flex-shrink-0`}>
+                  <span className="text-base">{currentConfig.emoji}</span>
                 </div>
                 <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
                   <div className="flex items-center gap-2">
@@ -522,38 +630,20 @@ export default function TonnyAIPage() {
 
           {/* Mobile Quick Actions */}
           <div className="lg:hidden flex gap-2 px-4 py-2 overflow-x-auto border-t border-border bg-muted/20 scrollbar-hide">
-            <button
-              onClick={() => sendMessage('Dame un resumen del inventario')}
-              disabled={isLoading || isRecording}
-              className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all disabled:opacity-50"
-            >
-              📦 Inventario
-            </button>
-            <button
-              onClick={() => sendMessage('Que productos tienen stock bajo?')}
-              disabled={isLoading || isRecording}
-              className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 transition-all disabled:opacity-50"
-            >
-              ⚠️ Stock bajo
-            </button>
-            <button
-              onClick={() => sendMessage('Dame un resumen de finanzas')}
-              disabled={isLoading || isRecording}
-              className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-full bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-all disabled:opacity-50"
-            >
-              💰 Finanzas
-            </button>
-            <button
-              onClick={() => sendMessage('Muestrame las ultimas entregas')}
-              disabled={isLoading || isRecording}
-              className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all disabled:opacity-50"
-            >
-              🚚 Entregas
-            </button>
+            {currentConfig.quickActions.slice(0, 4).map((action, index) => (
+              <button
+                key={index}
+                onClick={() => sendMessage(action.prompt)}
+                disabled={isLoading || isRecording}
+                className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-full ${currentConfig.bgColor} ${currentConfig.color} ${currentConfig.borderColor} border transition-all disabled:opacity-50`}
+              >
+                {currentConfig.emoji} {action.label}
+              </button>
+            ))}
           </div>
 
           {/* Input Area */}
-          <div className="p-3 sm:p-4 border-t border-border bg-muted/30 pb-[env(safe-area-inset-bottom)]">
+          <div className={`p-3 sm:p-4 border-t ${currentConfig.borderColor} ${currentConfig.bgColor} pb-[env(safe-area-inset-bottom)]`}>
             {isRecording ? (
               /* Recording Mode UI */
               <div className="space-y-3">
@@ -562,7 +652,6 @@ export default function TonnyAIPage() {
                   <span className="text-base text-red-700 dark:text-red-400 font-semibold">Grabando audio...</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  {/* Cancel Button */}
                   <button
                     onClick={cancelRecording}
                     className="flex-1 h-14 rounded-xl flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold transition-all"
@@ -570,7 +659,6 @@ export default function TonnyAIPage() {
                     <X size={24} />
                     <span>Cancelar</span>
                   </button>
-                  {/* Send Recording Button */}
                   <button
                     onClick={stopRecording}
                     className="flex-1 h-14 rounded-xl flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold transition-all shadow-lg"
@@ -587,7 +675,7 @@ export default function TonnyAIPage() {
                 <button
                   onClick={startRecording}
                   disabled={isLoading || isTranscribing}
-                  className="h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center transition-all shadow-sm bg-card border border-border hover:border-primary hover:bg-primary/5 text-gray-600 dark:text-gray-400 hover:text-primary disabled:opacity-50"
+                  className={`h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center transition-all shadow-sm bg-card border hover:${currentConfig.borderColor} ${currentConfig.borderColor.replace('border-', 'hover:text-').replace('/30', '')} disabled:opacity-50`}
                   title="Grabar mensaje de voz"
                 >
                   <Mic size={20} />
@@ -600,8 +688,8 @@ export default function TonnyAIPage() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Escribe o habla..."
-                  className="flex-1 h-12 px-4 bg-card text-foreground rounded-xl border border-border outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                  placeholder={`Pregunta sobre ${currentConfig.name.toLowerCase()}...`}
+                  className={`flex-1 h-12 px-4 bg-card text-foreground rounded-xl border outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500`}
                   disabled={isLoading || isTranscribing}
                 />
 
