@@ -215,6 +215,42 @@ const functions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
+      name: 'update_delivery',
+      description: 'Actualiza una entrega existente (notas, cantidad, etc). Usa get_deliveries primero para obtener el ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          delivery_id: { type: 'string', description: 'ID de la entrega a actualizar' },
+          updates: {
+            type: 'object',
+            description: 'Campos a actualizar',
+            properties: {
+              notes: { type: 'string', description: 'Notas o comentarios sobre la entrega' },
+              quantity: { type: 'number', description: 'Nueva cantidad (usar con cuidado)' },
+            },
+          },
+        },
+        required: ['delivery_id', 'updates'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_delivery',
+      description: 'Elimina un registro de entrega',
+      parameters: {
+        type: 'object',
+        properties: {
+          delivery_id: { type: 'string', description: 'ID de la entrega a eliminar' },
+        },
+        required: ['delivery_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_inventory_summary',
       description: 'Obtiene un resumen completo del inventario: totales, por categoria, stock bajo, valor estimado',
       parameters: {
@@ -708,6 +744,7 @@ async function executeFunction(name: string, args: Record<string, unknown>): Pro
         if (error) throw error
 
         const deliveries = (data || []).map(d => ({
+          id: d.id,
           fecha: new Date(d.delivered_at).toLocaleDateString('es-MX'),
           producto: d.product?.name,
           cantidad: `${d.quantity} ${d.product?.unit}`,
@@ -715,6 +752,49 @@ async function executeFunction(name: string, args: Record<string, unknown>): Pro
           notas: d.notes || '-',
         }))
         return JSON.stringify(deliveries)
+      }
+
+      case 'update_delivery': {
+        const { data: current, error: fetchError } = await supabase
+          .from('deliveries')
+          .select('*, product:products(name)')
+          .eq('id', args.delivery_id)
+          .single()
+        if (fetchError) throw new Error('Entrega no encontrada')
+
+        const { data, error } = await supabase
+          .from('deliveries')
+          .update(args.updates as Record<string, unknown>)
+          .eq('id', args.delivery_id)
+          .select()
+          .single()
+        if (error) throw error
+
+        return JSON.stringify({
+          success: true,
+          mensaje: `Entrega de ${current.product?.name} a ${current.responsible} actualizada`,
+          entrega: data
+        })
+      }
+
+      case 'delete_delivery': {
+        const { data: current, error: fetchError } = await supabase
+          .from('deliveries')
+          .select('*, product:products(name)')
+          .eq('id', args.delivery_id)
+          .single()
+        if (fetchError) throw new Error('Entrega no encontrada')
+
+        const { error } = await supabase
+          .from('deliveries')
+          .delete()
+          .eq('id', args.delivery_id)
+        if (error) throw error
+
+        return JSON.stringify({
+          success: true,
+          mensaje: `Entrega de ${current.product?.name} a ${current.responsible} eliminada`
+        })
       }
 
       case 'get_inventory_summary': {
@@ -976,8 +1056,12 @@ CAPACIDADES COMPLETAS:
 - Ajustar stock (correcciones)
 - Ver productos con stock bajo
 - Ver historial de movimientos
-- Ver entregas por responsable
 - Resumen completo del inventario
+
+🚚 ENTREGAS:
+- Ver entregas por responsable
+- Actualizar entregas (añadir notas, modificar)
+- Eliminar entregas
 
 💰 COMPRAS:
 - Ver registro de compras
@@ -1042,6 +1126,14 @@ EJEMPLOS:
 
 "que cotizaciones tenemos pendientes"
 -> Muestro cotizaciones con status pendiente
+
+"añade una nota a la ultima entrega a Gustavo"
+-> Primero busco las entregas de Gustavo para obtener el ID, luego actualizo la nota
+
+IMPORTANTE PARA MODIFICAR ENTREGAS:
+- Siempre usa get_deliveries primero para obtener el ID de la entrega
+- Luego usa update_delivery con ese ID para añadir notas o modificar
+- Las entregas tienen: id, fecha, producto, cantidad, responsable, notas
 
 ACTUA RAPIDO. SE UTIL. EL USUARIO CONFIA EN TI.`
 

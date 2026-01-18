@@ -29,6 +29,23 @@ interface Message {
   timestamp: Date
 }
 
+const STORAGE_KEY = 'tonny-ai-chat-history'
+const WELCOME_MESSAGE: Message = {
+  role: 'assistant',
+  content: '¡Hola! Soy TonnyAI 🤖 Tu asistente de gestion.\n\n' +
+    'Puedo ayudarte con:\n\n' +
+    '📦 Inventario\n' +
+    '- "Agrega 20 galones de pintura blanca"\n' +
+    '- "Dame 5 tubos a Jordi"\n' +
+    '- "Cuantas brochas hay?"\n\n' +
+    '💰 Compras y Cotizaciones\n' +
+    '- "Registra compra de $3,500 en Home Depot"\n' +
+    '- "Nueva cotizacion de Truper por $8,000"\n' +
+    '- "Cuanto hemos gastado este mes?"\n\n' +
+    '¡Habla o escribe, estoy listo!',
+  timestamp: new Date(),
+}
+
 // Acciones rápidas organizadas por categoría
 const quickActionsInventory = [
   { label: 'Resumen inventario', prompt: 'Dame un resumen del inventario', icon: Package },
@@ -50,23 +67,8 @@ const quickActionsDeliveries = [
 ]
 
 export default function TonnyAIPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: '¡Hola! Soy TonnyAI 🤖 Tu asistente de gestion.\n\n' +
-        'Puedo ayudarte con:\n\n' +
-        '📦 Inventario\n' +
-        '- "Agrega 20 galones de pintura blanca"\n' +
-        '- "Dame 5 tubos a Jordi"\n' +
-        '- "Cuantas brochas hay?"\n\n' +
-        '💰 Compras y Cotizaciones\n' +
-        '- "Registra compra de $3,500 en Home Depot"\n' +
-        '- "Nueva cotizacion de Truper por $8,000"\n' +
-        '- "Cuanto hemos gastado este mes?"\n\n' +
-        '¡Habla o escribe, estoy listo!',
-      timestamp: new Date(),
-    },
-  ])
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
+  const [isHydrated, setIsHydrated] = useState(false)
   const [activeSection, setActiveSection] = useState<'inventory' | 'finance' | 'deliveries'>('inventory')
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -80,6 +82,38 @@ export default function TonnyAIPage() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
+
+  // Cargar historial de localStorage al montar
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Convertir timestamps de string a Date
+        const messagesWithDates = parsed.map((m: Message & { timestamp: string }) => ({
+          ...m,
+          timestamp: new Date(m.timestamp)
+        }))
+        if (messagesWithDates.length > 0) {
+          setMessages(messagesWithDates)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error)
+    }
+    setIsHydrated(true)
+  }, [])
+
+  // Guardar mensajes en localStorage cuando cambien (después de hidratar)
+  useEffect(() => {
+    if (isHydrated && messages.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+      } catch (error) {
+        console.error('Error saving chat history:', error)
+      }
+    }
+  }, [messages, isHydrated])
 
   useEffect(() => {
     scrollToBottom()
@@ -240,13 +274,18 @@ export default function TonnyAIPage() {
   }
 
   const clearChat = () => {
-    setMessages([
-      {
-        role: 'assistant',
-        content: '🔄 Chat reiniciado. ¿Que necesitas?',
-        timestamp: new Date(),
-      },
-    ])
+    const resetMessage: Message = {
+      role: 'assistant',
+      content: '🔄 Chat reiniciado. ¿Que necesitas?',
+      timestamp: new Date(),
+    }
+    setMessages([resetMessage])
+    // Limpiar localStorage
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch (error) {
+      console.error('Error clearing chat history:', error)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
