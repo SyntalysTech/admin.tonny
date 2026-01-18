@@ -4,6 +4,12 @@
 -- Descripción: Agrega campos estructurados para datos extraídos de facturas
 -- ============================================
 
+-- Primero asegurar que existan las columnas de la migración anterior (status, ai_response, processed_at)
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS ai_response JSONB,
+  ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ;
+
 -- Campos para datos extraídos de la factura
 ALTER TABLE invoices
   ADD COLUMN IF NOT EXISTS supplier VARCHAR(255),
