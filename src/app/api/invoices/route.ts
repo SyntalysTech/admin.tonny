@@ -136,6 +136,29 @@ export async function POST(request: Request) {
     // Update invoice with purchase_id
     await supabase.from('invoices').update({ purchase_id: insertedPurchase.id }).eq('id', invoiceInserted.id)
 
+    // Notify TonnyAI to refine/assign fields and update the purchase if needed
+    try {
+      const tonnyRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/tonny-ai`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'invoices',
+          messages: [
+            {
+              role: 'user',
+              content: `Procesa esta factura. Invoice URL: ${publicUrl}. Texto extraído: ${extractedText || ''}. Registra o actualiza la compra con ID ${insertedPurchase.id}. Extrae proveedor, total, numero de factura y fecha si están disponibles y actualiza el registro.`,
+            },
+          ],
+        }),
+      })
+
+      // ignore TonnyAI response for now, but log if useful
+      const tonnyJson = await tonnyRes.json().catch(() => null)
+      console.log('TonnyAI notified for invoice', tonnyJson)
+    } catch (err) {
+      console.warn('Failed to notify TonnyAI', err)
+    }
+
     return NextResponse.json({ invoice: invoiceInserted, inserted: insertedPurchase, file: publicUrl, extractedText })
   } catch (error) {
     console.error('Invoices POST error', error)
